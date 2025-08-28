@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rayzz's Converter | Convert Videos, Images & Audio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- FFmpeg library for video/audio conversion -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+    <!-- Image conversion libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.0/dist/browser-image-compression.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/2.2.0/heic2any.min.js"></script>
+    <style>
+        .dropzone {
+            border: 2px dashed #3b82f6;
+            transition: all 0.3s ease;
+        }
+        .dropzone.active {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.05);
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        .file-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .tooltip {
+            position: relative;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 120px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        @media (max-width: 640px) {
+            .conversion-options {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-blue-600 mb-2">Rayzz's Converter</h1>
+            <p class="text-gray-600 text-lg">Convert videos, images, and audio files between formats in seconds</p>
+        </header>
+
+        
+        <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 mb-8">
+            
+            <div id="dropzone" class="dropzone rounded-lg p-8 text-center cursor-pointer mb-6">
+                <div class="flex flex-col items-center justify-center">
+                    <i class="fas fa-cloud-upload-alt text-blue-500 text-5xl mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-700 mb-2">Drag & Drop Files Here</h3>
+                    <p class="text-gray-500 mb-4">or click to browse your files</p>
+                    <input type="file" id="fileInput" class="hidden" multiple>
+                    <button id="browseBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-300">
+                        Select Files
+                    </button>
+                </div>
+            </div>
+
+            
+            <div id="filesPreview" class="hidden mb-6">
+                <h3 class="text-lg font-semibold text-gray-700 mb-3">Selected Files</h3>
+                <div id="fileList" class="space-y-3"></div>
+            </div>
+
+            
+            <div id="conversionOptions" class="hidden">
+                <div class="flex flex-wrap gap-4 mb-6 conversion-options">
+                    
+                    <div class="flex-1 min-w-[200px]">
+                        <label for="outputFormat" class="block text-sm font-medium text-gray-700 mb-1">Output Format</label>
+                        <select id="outputFormat" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Auto-detect</option>
+                            <optgroup label="Video Formats">
+                                <option value="mp4">MP4</option>
+                                <option value="mov">MOV</option>
+                                <option value="avi">AVI</option>
+                                <option value="mkv">MKV</option>
+                                <option value="webm">WEBM</option>
+                            </optgroup>
+                            <optgroup label="Image Formats">
+                                <option value="jpg">JPG</option>
+                                <option value="png">PNG</option>
+                                <option value="webp">WEBP</option>
+                                <option value="gif">GIF</option>
+                                <option value="svg">SVG</option>
+                            </optgroup>
+                            <optgroup label="Audio Formats">
+                                <option value="mp3">MP3</option>
+                                <option value="wav">WAV</option>
+                                <option value="ogg">OGG</option>
+                                <option value="flac">FLAC</option>
+                                <option value="aac">AAC</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    
+                    <div class="flex-1 min-w-[200px]">
+                        <label for="quality" class="block text-sm font-medium text-gray-700 mb-1">Quality</label>
+                        <select id="quality" class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                            <option value="high">High (Best Quality)</option>
+                            <option value="medium" selected>Medium (Balanced)</option>
+                            <option value="low">Low (Smaller Size)</option>
+                        </select>
+                    </div>
+
+                    
+                    <div class="flex-1 min-w-[200px]">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Batch Options</label>
+                        <div class="flex items-center space-x-4">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="batchConvert" class="rounded text-blue-600">
+                                <span class="ml-2 text-sm">Convert all to same format</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div class="text-center">
+                    <button id="convertBtn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-8 rounded-lg transition duration-300">
+                        <i class="fas fa-exchange-alt mr-2"></i> Convert Files
+                    </button>
+                </div>
+            </div>
+
+            
+            <div id="conversionProgress" class="hidden mt-8">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Conversion Progress</h3>
+                <div id="progressContainer" class="space-y-4"></div>
+            </div>
+
+            
+            <div id="resultsSection" class="hidden mt-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-700">Converted Files</h3>
+                    <button id="downloadAllBtn" class="text-sm bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded">
+                        <i class="fas fa-download mr-1"></i> Download All
+                    </button>
+                </div>
+                <div id="resultsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </div>
+
+        
+        <div class="max-w-4xl mx-auto mb-12">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Why Choose My Converter?</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                    <div class="text-blue-500 text-3xl mb-3">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Fast Conversion</h3>
+                    <p class="text-gray-600">Convert files in seconds with our optimized processing engine.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                    <div class="text-blue-500 text-3xl mb-3">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">Secure Processing</h3>
+                    <p class="text-gray-600">Files are processed in your browser and never uploaded to any server.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm text-center">
+                    <div class="text-blue-500 text-3xl mb-3">
+                        <i class="fas fa-file-export"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">27 Formats</h3>
+                    <p class="text-gray-600">Support for all major video, image, and audio formats.</p>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Supported Formats</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <h3 class="font-semibold text-lg mb-3 text-center text-blue-600">Video</h3>
+                    <ul class="space-y-1 text-center text-gray-700">
+                        <li>MP4, MOV, AVI</li>
+                        <li>MKV, WEBM, FLV</li>
+                        <li>WMV, 3GP, MPEG</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg mb-3 text-center text-blue-600">Image</h3>
+                    <ul class="space-y-1 text-center text-gray-700">
+                        <li>JPG, PNG, GIF</li>
+                        <li>WEBP, SVG, BMP</li>
+                        <li>TIFF, ICO, HEIC</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg mb-3 text-center text-blue-600">Audio</h3>
+                    <ul class="space-y-1 text-center text-gray-700">
+                        <li>MP3, WAV, OGG</li>
+                        <li>FLAC, AAC, M4A</li>
+                        <li>WMA, AIFF, OPUS</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-gray-100 py-6 mt-12">
+        <div class="container mx-auto px-4 text-center text-gray-600">
+            <p>© 2025 Rayzz. All rights reserved.</p>
+            <p class="mt-2 text-sm">Files are processed in your browser - no server upload required.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+            const browseBtn = document.getElementById('browseBtn');
+            const filesPreview = document.getElementById('filesPreview');
+            const fileList = document.getElementById('fileList');
+            const conversionOptions = document.getElementById('conversionOptions');
+            const outputFormat = document.getElementById('outputFormat');
+            const convertBtn = document.getElementById('convertBtn');
+            const conversionProgress = document.getElementById('conversionProgress');
+            const progressContainer = document.getElementById('progressContainer');
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsList = document.getElementById('resultsList');
+            const downloadAllBtn = document.getElementById('downloadAllBtn');
+            const batchConvert = document.getElementById('batchConvert');
+            const qualitySelect = document.getElementById('quality');
+            
+            let files = [];
+            let convertedFiles = [];
+            let ffmpeg = null;
+            let isFFmpegLoaded = false;
+
+            // Initialize FFmpeg
+            async function initFFmpeg() {
+                try {
+                    if (!ffmpeg) {
+                        const { createFFmpeg, fetchFile } = FFmpeg;
+                        ffmpeg = createFFmpeg({ 
+                            log: false,
+                            progress: ({ ratio }) => {
+                                // Progress will be handled per file
+                            }
+                        });
+                    }
+                    
+                    if (!isFFmpegLoaded) {
+                        await ffmpeg.load();
+                        isFFmpegLoaded = true;
+                    }
+                    return true;
+                } catch (error) {
+                    console.error('Error loading FFmpeg:', error);
+                    alert('Failed to initialize the converter. Please refresh the page and try again.');
+                    return false;
+                }
+            }
+
+            
+            browseBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            dropzone.addEventListener('dragover', handleDragOver);
+            dropzone.addEventListener('dragleave', handleDragLeave);
+            dropzone.addEventListener('drop', handleDrop);
+            convertBtn.addEventListener('click', startConversion);
+            downloadAllBtn.addEventListener('click', downloadAllFiles);
+
+            // Functions
+            function handleFileSelect(e) {
+                files = Array.from(e.target.files);
+                if (files.length > 0) {
+                    displaySelectedFiles();
+                }
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('active');
+            }
+
+            function handleDragLeave(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('active');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('active');
+                
+                files = Array.from(e.dataTransfer.files);
+                if (files.length > 0) {
+                    displaySelectedFiles();
+                }
+            }
+
+            function displaySelectedFiles() {
+                fileList.innerHTML = '';
+                
+                files.forEach((file, index) => {
+                    const fileType = getFileType(file.name);
+                    const fileIcon = getFileIcon(fileType);
+                    const fileSize = formatFileSize(file.size);
+                    
+                    const fileCard = document.createElement('div');
+                    fileCard.className = 'file-card bg-gray-50 p-3 rounded-lg flex items-center justify-between transition duration-200';
+                    fileCard.innerHTML = `
+                        <div class="flex items-center">
+                            <div class="text-blue-500 text-xl mr-3">${fileIcon}</div>
+                            <div>
+                                <p class="font-medium text-gray-800 truncate max-w-[180px]">${file.name}</p>
+                                <p class="text-xs text-gray-500">${fileSize} • ${fileType.toUpperCase()}</p>
+                            </div>
+                        </div>
+                        <button class="remove-file text-red-500 hover:text-red-700" data-index="${index}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    
+                    fileList.appendChild(fileCard);
+                });
+                
+                
+                document.querySelectorAll('.remove-file').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        files.splice(index, 1);
+                        if (files.length > 0) {
+                            displaySelectedFiles();
+                        } else {
+                            filesPreview.classList.add('hidden');
+                            conversionOptions.classList.add('hidden');
+                        }
+                    });
+                });
+                
+                filesPreview.classList.remove('hidden');
+                conversionOptions.classList.remove('hidden');
+            }
+
+            function getFileType(filename) {
+                const extension = filename.split('.').pop().toLowerCase();
+                if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv', '3gp', 'mpeg'].includes(extension)) {
+                    return 'video';
+                } else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'tiff', 'ico', 'heic'].includes(extension)) {
+                    return 'image';
+                } else if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma', 'aiff', 'opus'].includes(extension)) {
+                    return 'audio';
+                }
+                return 'file';
+            }
+
+            function getFileIcon(fileType) {
+                switch(fileType) {
+                    case 'video': return '<i class="fas fa-file-video"></i>';
+                    case 'image': return '<i class="fas fa-file-image"></i>';
+                    case 'audio': return '<i class="fas fa-file-audio"></i>';
+                    default: return '<i class="fas fa-file"></i>';
+                }
+            }
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            async function startConversion() {
+                if (files.length === 0) return;
+                
+                // Initialize FFmpeg if needed
+                const hasVideoOrAudio = files.some(file => {
+                    const type = getFileType(file.name);
+                    return type === 'video' || type === 'audio';
+                });
+                
+                if (hasVideoOrAudio) {
+                    const success = await initFFmpeg();
+                    if (!success) return;
+                }
+                
+                conversionProgress.classList.remove('hidden');
+                progressContainer.innerHTML = '';
+                convertedFiles = [];
+                
+                // Process each file
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const fileType = getFileType(file.name);
+                    const targetFormat = outputFormat.value || getDefaultFormat(fileType);
+                    
+                    const progressItem = document.createElement('div');
+                    progressItem.className = 'bg-gray-50 rounded-lg p-4';
+                    progressItem.innerHTML = `
+                        <div class="flex justify-between mb-2">
+                            <span class="font-medium text-gray-800 truncate max-w-[200px]">${file.name}</span>
+                            <span class="text-sm text-gray-600">${fileType.toUpperCase()} → ${targetFormat.toUpperCase()}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div id="progress-${i}" class="progress-bar bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <div class="flex justify-between mt-2 text-sm text-gray-600">
+                            <span id="status-${i}">Preparing...</span>
+                            <span id="speed-${i}"></span>
+                        </div>
+                    `;
+                    
+                    progressContainer.appendChild(progressItem);
+                    
+                    // Convert the file
+                    await convertFile(i, file, targetFormat);
+                }
+                
+                
+                resultsSection.classList.remove('hidden');
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
+
+            function getDefaultFormat(fileType) {
+                switch(fileType) {
+                    case 'video': return 'mp4';
+                    case 'image': return 'jpg';
+                    case 'audio': return 'mp3';
+                    default: return 'file';
+                }
+            }
+
+            async function convertFile(index, file, targetFormat) {
+                const progressBar = document.getElementById(`progress-${index}`);
+                const statusText = document.getElementById(`status-${index}`);
+                const speedText = document.getElementById(`speed-${index}`);
+                
+                const fileType = getFileType(file.name);
+                let convertedBlob = null;
+                
+                try {
+                    
+                    progressBar.style.width = `10%`;
+                    statusText.textContent = 'Converting...';
+                    
+                    
+                    if (fileType === 'image') {
+                        convertedBlob = await convertImage(file, targetFormat, index, progressBar);
+                    } else if (fileType === 'video' || fileType === 'audio') {
+                        convertedBlob = await convertVideoAudio(file, targetFormat, index, progressBar, statusText);
+                    } else {
+                        throw new Error(`Unsupported file type: ${fileType}`);
+                    }
+                    
+                    
+                    progressBar.style.width = `100%`;
+                    progressBar.classList.remove('bg-blue-600');
+                    progressBar.classList.add('bg-green-600');
+                    statusText.textContent = 'Completed';
+                    statusText.className = 'text-green-600';
+                    speedText.textContent = '';
+                    
+                    // Create download link
+                    const fileName = file.name.substring(0, file.name.lastIndexOf('.')) + '.' + targetFormat;
+                    const fileUrl = URL.createObjectURL(convertedBlob);
+                    
+                    
+                    convertedFiles.push({
+                        name: fileName,
+                        type: fileType,
+                        format: targetFormat,
+                        size: formatFileSize(convertedBlob.size),
+                        url: fileUrl,
+                        blob: convertedBlob,
+                        index: index
+                    });
+                    
+                    
+                    updateResultsList();
+                    
+                } catch (error) {
+                    console.error(`Error converting file ${file.name}:`, error);
+                    progressBar.classList.remove('bg-blue-600');
+                    progressBar.classList.add('bg-red-600');
+                    statusText.textContent = 'Error: ' + error.message;
+                    statusText.className = 'text-red-600';
+                }
+            }
+
+            async function convertImage(file, targetFormat, index, progressBar) {
+                // Handle HEIC format separately
+                if (file.name.toLowerCase().endsWith('.heic')) {
+                    progressBar.style.width = `30%`;
+                    const blob = await heic2any({
+                        blob: file,
+                        toType: targetFormat === 'jpg' ? 'image/jpeg' : `image/${targetFormat}`,
+                        quality: getQualityValue()
+                    });
+                    progressBar.style.width = `100%`;
+                    return blob;
+                }
+                
+                // Handle SVG conversion (limited)
+                if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+                    if (targetFormat !== 'svg') {
+                        throw new Error('SVG to other formats conversion is not supported in this version');
+                    }
+                    return file;
+                }
+                
+                // Handle other image formats
+                const options = {
+                    maxSizeMB: getMaxSizeMB(),
+                    maxWidthOrHeight: getMaxDimensions(),
+                    useWebWorker: true,
+                    fileType: `image/${targetFormat}`,
+                    initialQuality: getQualityValue()
+                };
+                
+                progressBar.style.width = `30%`;
+                const compressedBlob = await imageCompression(file, options);
+                progressBar.style.width = `100%`;
+                
+                return compressedBlob;
+            }
+
+            async function convertVideoAudio(file, targetFormat, index, progressBar, statusText) {
+                if (!isFFmpegLoaded) {
+                    throw new Error('Video/Audio converter not loaded');
+                }
+                
+                // Write the file to FFmpeg file system
+                progressBar.style.width = `20%`;
+                statusText.textContent = 'Loading file...';
+                const fileName = `input${index}.${file.name.split('.').pop()}`;
+                const outputFileName = `output${index}.${targetFormat}`;
+                
+                ffmpeg.FS('writeFile', fileName, await fetchFile(file));
+                
+                
+                let lastTime = Date.now();
+                let lastRatio = 0;
+                
+                ffmpeg.setProgress(({ ratio }) => {
+                    const currentTime = Date.now();
+                    if (currentTime - lastTime > 200) { 
+                        const progressPercent = Math.min(90, Math.round(ratio * 100 * 0.9) + 20);
+                        progressBar.style.width = `${progressPercent}%`;
+                        
+                        
+                        const speed = ((ratio - lastRatio) * file.size) / ((currentTime - lastTime) / 1000);
+                        if (speed > 0) {
+                            const speedTextElem = document.getElementById(`speed-${index}`);
+                            if (speedTextElem) {
+                                speedTextElem.textContent = `${formatFileSize(speed)}/s`;
+                            }
+                        }
+                        
+                        lastTime = currentTime;
+                        lastRatio = ratio;
+                    }
+                });
+                
+                
+                statusText.textContent = 'Converting...';
+                let command = [];
+                
+                if (getFileType(file.name) === 'video') {
+                    
+                    command = [
+                        '-i', fileName,
+                        '-c:v', getVideoCodec(targetFormat),
+                        '-c:a', getAudioCodec(targetFormat),
+                        '-preset', 'fast',
+                        outputFileName
+                    ];
+                } else {
+                    
+                    command = [
+                        '-i', fileName,
+                        '-b:a', getAudioBitrate(),
+                        outputFileName
+                    ];
+                }
+                
+                await ffmpeg.run(...command);
+                
+                
+                progressBar.style.width = `95%`;
+                statusText.textContent = 'Finalizing...';
+                const data = ffmpeg.FS('readFile', outputFileName);
+                
+                
+                ffmpeg.FS('unlink', fileName);
+                ffmpeg.FS('unlink', outputFileName);
+                
+                return new Blob([data.buffer], { type: getMimeType(targetFormat) });
+            }
+
+            function getQualityValue() {
+                switch(qualitySelect.value) {
+                    case 'high': return 0.9;
+                    case 'medium': return 0.7;
+                    case 'low': return 0.5;
+                    default: return 0.7;
+                }
+            }
+
+            function getMaxSizeMB() {
+                switch(qualitySelect.value) {
+                    case 'high': return 10;
+                    case 'medium': return 5;
+                    case 'low': return 2;
+                    default: return 5;
+                }
+            }
+
+            function getMaxDimensions() {
+                switch(qualitySelect.value) {
+                    case 'high': return 1920;
+                    case 'medium': return 1280;
+                    case 'low': return 800;
+                    default: return 1280;
+                }
+            }
+
+            function getVideoCodec(format) {
+                switch(format) {
+                    case 'webm': return 'libvpx-vp9';
+                    case 'avi': return 'mpeg4';
+                    default: return 'libx264';
+                }
+            }
+
+            function getAudioCodec(format) {
+                switch(format) {
+                    case 'webm': return 'libvorbis';
+                    default: return 'aac';
+                }
+            }
+
+            function getAudioBitrate() {
+                switch(qualitySelect.value) {
+                    case 'high': return '320k';
+                    case 'medium': return '192k';
+                    case 'low': return '128k';
+                    default: return '192k';
+                }
+            }
+
+            function getMimeType(format) {
+                switch(format) {
+                    case 'mp4': return 'video/mp4';
+                    case 'mov': return 'video/quicktime';
+                    case 'avi': return 'video/x-msvideo';
+                    case 'mkv': return 'video/x-matroska';
+                    case 'webm': return 'video/webm';
+                    case 'mp3': return 'audio/mpeg';
+                    case 'wav': return 'audio/wav';
+                    case 'ogg': return 'audio/ogg';
+                    case 'flac': return 'audio/flac';
+                    case 'aac': return 'audio/aac';
+                    default: return 'application/octet-stream';
+                }
+            }
+
+            function addConvertedFile(originalFile, targetFormat, index) {
+                const originalName = originalFile.name;
+                const convertedName = originalName.substring(0, originalName.lastIndexOf('.')) + '.' + targetFormat;
+                const fileType = getFileType(originalName);
+                const fileSize = formatFileSize(originalFile.size * (0.5 + Math.random() * 0.5)); 
+                
+                convertedFiles.push({
+                    name: convertedName,
+                    type: fileType,
+                    format: targetFormat,
+                    size: fileSize,
+                    index: index
+                });
+                
+                updateResultsList();
+            }
+
+            function updateResultsList() {
+                resultsList.innerHTML = '';
+                
+                convertedFiles.forEach((file, index) => {
+                    const fileCard = document.createElement('div');
+                    fileCard.className = 'bg-gray-50 p-4 rounded-lg';
+                    fileCard.innerHTML = `
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center">
+                                <div class="text-green-500 text-xl mr-3">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-800">${file.name}</p>
+                                    <p class="text-xs text-gray-500">${file.size} • ${file.format.toUpperCase()}</p>
+                                </div>
+                            </div>
+                            <button class="download-file bg-blue-600 hover:bg-blue-700 text-white text-sm py-1 px-3 rounded" data-index="${index}">
+                                <i class="fas fa-download mr-1"></i> Download
+                            </button>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500">
+                            <span>Original: ${files[file.index].name}</span>
+                            <span class="tooltip">
+                                <i class="fas fa-info-circle"></i>
+                                <span class="tooltip-text">File processed locally in your browser</span>
+                            </span>
+                        </div>
+                    `;
+                    
+                    resultsList.appendChild(fileCard);
+                });
+                
+                
+                document.querySelectorAll('.download-file').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        downloadFile(convertedFiles[index]);
+                    });
+                });
+            }
+
+            function downloadFile(file) {
+                const a = document.createElement('a');
+                a.href = file.url;
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+
+            function downloadAllFiles() {
+                if (convertedFiles.length === 0) return;
+                
+                
+                alert(`Preparing to download ${convertedFiles.length} files\n\n(In a real application, this would create a ZIP file with all converted files)`);
+                
+                convertedFiles.forEach((file, index) => {
+                    setTimeout(() => {
+                        downloadFile(file);
+                    }, index * 300);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
